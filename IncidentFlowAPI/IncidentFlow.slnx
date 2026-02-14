@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/IncidentFlow.API/IncidentFlow.API.csproj" />
+    <Project Path="src/IncidentFlow.Application/IncidentFlow.Application.csproj" />
+    <Project Path="src/IncidentFlow.Domain/IncidentFlow.Domain.csproj" />
+    <Project Path="src/IncidentFlow.Infrastructure/IncidentFlow.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/IncidentFlow.IntegrationTests/IncidentFlow.IntegrationTests.csproj" />
+    <Project Path="tests/IncidentFlow.UnitTests/IncidentFlow.UnitTests.csproj" />
+  </Folder>
+</Solution>
