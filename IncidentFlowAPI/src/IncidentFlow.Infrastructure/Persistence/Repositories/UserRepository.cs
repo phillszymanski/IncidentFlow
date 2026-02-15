@@ -30,6 +30,18 @@ public class UserRepository : IUserRepository
         return await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 
+    public async Task<User?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Users
+            .FirstOrDefaultAsync(x => x.Username.ToLower() == username.ToLower(), cancellationToken);
+    }
+
+    public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Users
+            .FirstOrDefaultAsync(x => x.Email.ToLower() == email.ToLower(), cancellationToken);
+    }
+
     public async Task<List<User>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _dbContext.Users.ToListAsync(cancellationToken);

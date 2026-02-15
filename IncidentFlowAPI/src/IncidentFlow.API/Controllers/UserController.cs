@@ -1,7 +1,9 @@
 using IncidentFlow.API.Contracts.Users;
+using IncidentFlow.API.Services;
 using IncidentFlow.Application.Features.Users.Commands;
 using IncidentFlow.Application.Features.Users.Queries;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace IncidentFlow.API.Controllers;
@@ -11,12 +13,15 @@ namespace IncidentFlow.API.Controllers;
 public class UserController : BaseController
 {
     private readonly IMediator _mediator;
+    private readonly IPasswordHashService _passwordHashService;
 
-    public UserController(IMediator mediator)
+    public UserController(IMediator mediator, IPasswordHashService passwordHashService)
     {
         _mediator = mediator;
+        _passwordHashService = passwordHashService;
     }
 
+    [Authorize(Policy = "CanManageUsers")]
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -25,6 +30,7 @@ public class UserController : BaseController
         return HandleResult(dto);
     }
 
+    [Authorize(Policy = "CanManageUsers")]
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id)
     {
@@ -34,23 +40,34 @@ public class UserController : BaseController
         return HandleResult(user.ToResponseDto());
     }
 
+    [AllowAnonymous]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] UserCreateDto dto)
     {
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
+        if (string.IsNullOrWhiteSpace(dto.Password))
+            return BadRequest("Password is required.");
+
+        var requestedRole = dto.Role;
+        var canManageUsers = User.HasClaim("permission", "users:manage");
+        var effectiveRole = canManageUsers ? requestedRole : "User";
+
         var id = await _mediator.Send(new CreateUserCommand
         {
             Username = dto.Username,
             Email = dto.Email,
-            FullName = dto.FullName
+            FullName = dto.FullName,
+            Role = effectiveRole,
+            PasswordHash = _passwordHashService.HashPassword(dto.Password)
         });
 
         var created = await _mediator.Send(new GetUserByIdQuery(id));
         return CreatedAtAction(nameof(Get), new { id }, created?.ToResponseDto());
     }
 
+    [Authorize(Policy = "CanManageUsers")]
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UserUpdateDto dto)
     {
@@ -59,13 +76,18 @@ public class UserController : BaseController
             Id = id,
             Username = dto.Username,
             Email = dto.Email,
-            FullName = dto.FullName
+            FullName = dto.FullName,
+            Role = dto.Role,
+            PasswordHash = string.IsNullOrWhiteSpace(dto.Password)
+                ? null
+                : _passwordHashService.HashPassword(dto.Password)
         });
 
         if (user is null) return NotFound();
         return NoContent();
     }
 
+    [Authorize(Policy = "CanManageUsers")]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {

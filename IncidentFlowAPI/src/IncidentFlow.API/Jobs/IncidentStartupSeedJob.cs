@@ -1,4 +1,5 @@
 using IncidentFlow.Domain.Entities;
+using IncidentFlow.API.Services;
 using IncidentFlow.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -10,6 +11,9 @@ public sealed class IncidentStartupSeedJob : IHostedService
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<IncidentStartupSeedJob> _logger;
     private readonly IncidentSeedOptions _seedOptions;
+    private const string AdminEmail = "admin@test.com";
+    private const string AdminPassword = "adminpass";
+    private const string AdminUsername = "admin";
 
     public IncidentStartupSeedJob(
         IServiceProvider serviceProvider,
@@ -31,8 +35,35 @@ public sealed class IncidentStartupSeedJob : IHostedService
 
         using var scope = _serviceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<IncidentFlowDbContext>();
+        var passwordHashService = scope.ServiceProvider.GetRequiredService<IPasswordHashService>();
 
         await dbContext.Database.MigrateAsync(cancellationToken);
+
+        var adminUserExists = await dbContext.Users
+            .AsNoTracking()
+            .AnyAsync(user => user.Email.ToLower() == AdminEmail.ToLower(), cancellationToken);
+
+        if (!adminUserExists)
+        {
+            var adminUser = new User
+            {
+                Username = AdminUsername,
+                FullName = "System Administrator",
+                Email = AdminEmail,
+                Role = "Admin",
+                PasswordHash = passwordHashService.HashPassword(AdminPassword),
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await dbContext.Users.AddAsync(adminUser, cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Seeded default admin user {AdminEmail}.", AdminEmail);
+        }
+        else
+        {
+            _logger.LogInformation("Admin user {AdminEmail} already exists. Skipping admin seed.", AdminEmail);
+        }
 
         var hasAnyIncidents = await dbContext.Incidents
             .AsNoTracking()

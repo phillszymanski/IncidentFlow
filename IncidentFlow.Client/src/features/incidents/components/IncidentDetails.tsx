@@ -110,12 +110,6 @@ export const IncidentDetails = ({ incident, onEdit }: IncidentDetailsProps) => {
         >
           Edit
         </button>
-        <button
-          type="button"
-          className="inline-flex w-full items-center justify-center rounded-xl bg-rose-500/90 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-400"
-        >
-          Delete
-        </button>
       </div>
     </div>
   );

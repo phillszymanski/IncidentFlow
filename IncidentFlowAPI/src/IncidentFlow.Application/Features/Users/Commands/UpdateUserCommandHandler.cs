@@ -36,6 +36,16 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, User?
             user.FullName = request.FullName;
         }
 
+        if (!string.IsNullOrWhiteSpace(request.Role))
+        {
+            user.Role = request.Role;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.PasswordHash))
+        {
+            user.PasswordHash = request.PasswordHash;
+        }
+
         await _repository.UpdateAsync(user, cancellationToken);
         return user;
     }

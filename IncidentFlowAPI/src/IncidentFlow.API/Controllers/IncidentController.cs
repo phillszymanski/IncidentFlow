@@ -2,6 +2,7 @@ using IncidentFlow.API.Contracts.Incidents;
 using IncidentFlow.Application.Features.Incidents.Commands;
 using IncidentFlow.Application.Features.Incidents.Queries;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace IncidentFlow.API.Controllers
@@ -18,6 +19,7 @@ namespace IncidentFlow.API.Controllers
         }
 
         // GET: api/Incident
+        [Authorize(Policy = "CanReadIncidents")]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -27,6 +29,7 @@ namespace IncidentFlow.API.Controllers
         }
 
         // GET: api/Incident/{id}
+        [Authorize(Policy = "CanReadIncidents")]
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> Get(Guid id)
         {
@@ -37,18 +40,25 @@ namespace IncidentFlow.API.Controllers
         }
 
         // POST: api/Incident
+        [Authorize(Policy = "CanWriteIncidents")]
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] IncidentCreateDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
+            var userIdClaim = User.FindFirst("userId")?.Value;
+            if (!Guid.TryParse(userIdClaim, out var createdByUserId))
+            {
+                return Unauthorized("Missing authenticated user context.");
+            }
+
             var command = new CreateIncidentCommand
             {
                 Title = dto.Title,
                 Description = dto.Description,
                 Severity = dto.Severity,
-                CreatedBy = dto.CreatedBy,
+                CreatedBy = createdByUserId,
                 AssignedTo = dto.AssignedTo
             };
 
@@ -59,6 +69,7 @@ namespace IncidentFlow.API.Controllers
         }
 
         // PUT: api/Incident/{id}
+        [Authorize(Policy = "CanWriteIncidents")]
         [HttpPut("{id:guid}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] IncidentUpdateDto dto)
         {
@@ -78,6 +89,7 @@ namespace IncidentFlow.API.Controllers
         }
 
         // DELETE: api/Incident/{id}
+        [Authorize(Policy = "CanWriteIncidents")]
         [HttpDelete("{id:guid}")]
         public async Task<IActionResult> Delete(Guid id)
         {

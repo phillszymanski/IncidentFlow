@@ -20,6 +20,8 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, Guid>
             Username = request.Username,
             Email = request.Email,
             FullName = request.FullName,
+            Role = request.Role,
+            PasswordHash = request.PasswordHash,
             CreatedAt = DateTime.UtcNow
         };
 

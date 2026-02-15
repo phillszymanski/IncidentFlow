@@ -12,6 +12,7 @@ public static class UserMappingExtensions
             Username = user.Username,
             Email = user.Email,
             FullName = user.FullName,
+            Role = user.Role,
             CreatedAt = user.CreatedAt
         };
     }
