@@ -1,5 +1,6 @@
 using IncidentFlow.Application.Features.Incidents.Commands;
 using IncidentFlow.Application.Interfaces;
+using IncidentFlow.API.Jobs;
 using IncidentFlow.Infrastructure.Persistence;
 using IncidentFlow.Infrastructure.Persistence.Repositories;
 using MediatR;
@@ -13,6 +14,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(CreateIncidentCommand).Assembly));
+builder.Services.Configure<IncidentSeedOptions>(builder.Configuration.GetSection("IncidentSeed"));
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
@@ -31,6 +33,18 @@ builder.Services.AddScoped<IUserRepository>(provider =>
 builder.Services.AddScoped<IIncidentLogRepository>(provider =>
     new IncidentLogRepository(provider.GetRequiredService<IncidentFlowDbContext>()));
 
+builder.Services.AddHostedService<IncidentStartupSeedJob>();
+
+    builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend",
+        policy =>
+        {
+            policy.WithOrigins("http://localhost:5173")
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        });
+});
 
 var app = builder.Build();
 
@@ -40,6 +54,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+app.UseCors("AllowFrontend");
 
 app.UseHttpsRedirection();
 

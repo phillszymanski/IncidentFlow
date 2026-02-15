@@ -16,6 +16,7 @@ public static class IncidentMappingExtensions
             CreatedBy = incident.CreatedBy,
             AssignedTo = incident.AssignedTo,
             CreatedAt = incident.CreatedAt,
+            UpdatedAt = incident.UpdatedAt,
             ResolvedAt = incident.ResolvedAt
         };
     }

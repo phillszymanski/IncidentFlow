@@ -10,6 +10,7 @@ public sealed class IncidentResponseDto
     public Guid CreatedBy { get; init; }
     public Guid? AssignedTo { get; init; }
     public DateTime CreatedAt { get; init; }
+    public DateTime UpdatedAt { get; init; }
     public DateTime? ResolvedAt { get; init; }
 }
 

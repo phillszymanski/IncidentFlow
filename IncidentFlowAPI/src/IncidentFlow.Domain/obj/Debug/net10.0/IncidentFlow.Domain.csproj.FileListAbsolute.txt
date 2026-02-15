@@ -9,3 +9,4 @@ C:\Repos\IncidentFlow\IncidentFlowAPI\src\IncidentFlow.Domain\obj\Debug\net10.0\
 C:\Repos\IncidentFlow\IncidentFlowAPI\src\IncidentFlow.Domain\obj\Debug\net10.0\refint\IncidentFlow.Domain.dll
 C:\Repos\IncidentFlow\IncidentFlowAPI\src\IncidentFlow.Domain\obj\Debug\net10.0\IncidentFlow.Domain.pdb
 C:\Repos\IncidentFlow\IncidentFlowAPI\src\IncidentFlow.Domain\obj\Debug\net10.0\ref\IncidentFlow.Domain.dll
+C:\Repos\IncidentFlow\IncidentFlowAPI\src\IncidentFlow.Domain\obj\Debug\net10.0\IncidentFlow.Domain.sourcelink.json

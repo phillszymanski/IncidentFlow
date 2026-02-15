@@ -17,3 +17,4 @@ C:\Repos\IncidentFlow\IncidentFlowAPI\src\IncidentFlow.Infrastructure\obj\Debug\
 C:\Repos\IncidentFlow\IncidentFlowAPI\src\IncidentFlow.Infrastructure\obj\Debug\net10.0\IncidentFlow.Infrastructure.pdb
 C:\Repos\IncidentFlow\IncidentFlowAPI\src\IncidentFlow.Infrastructure\obj\Debug\net10.0\IncidentFlow.Infrastructure.genruntimeconfig.cache
 C:\Repos\IncidentFlow\IncidentFlowAPI\src\IncidentFlow.Infrastructure\obj\Debug\net10.0\ref\IncidentFlow.Infrastructure.dll
+C:\Repos\IncidentFlow\IncidentFlowAPI\src\IncidentFlow.Infrastructure\obj\Debug\net10.0\IncidentFlow.Infrastructure.sourcelink.json

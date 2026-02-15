@@ -145,3 +145,4 @@ C:\Repos\IncidentFlow\IncidentFlowAPI\src\IncidentFlow.API\obj\Debug\net10.0\ref
 C:\Repos\IncidentFlow\IncidentFlowAPI\src\IncidentFlow.API\bin\Debug\net10.0\Swashbuckle.AspNetCore.Swagger.dll
 C:\Repos\IncidentFlow\IncidentFlowAPI\src\IncidentFlow.API\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerGen.dll
 C:\Repos\IncidentFlow\IncidentFlowAPI\src\IncidentFlow.API\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerUI.dll
+C:\Repos\IncidentFlow\IncidentFlowAPI\src\IncidentFlow.API\obj\Debug\net10.0\IncidentFlow.API.sourcelink.json

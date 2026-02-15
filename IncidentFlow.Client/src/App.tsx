@@ -1,34 +1,53 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState } from "react"
+import { IncidentListPage } from "./features/incidents/pages/IncidentListPage"
+import { NewIncidentPage } from "./features/incidents/pages/NewIncidentPage"
+import type { Incident } from "./features/incidents/types"
+
+type AppPage = "list" | "new" | "edit"
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [page, setPage] = useState<AppPage>("list")
+  const [listVersion, setListVersion] = useState(0)
+  const [editingIncident, setEditingIncident] = useState<Incident | null>(null)
+
+  const handleReportIncident = () => {
+    setEditingIncident(null)
+    setPage("new")
+  }
+
+  const handleEditIncident = (incident: Incident) => {
+    setEditingIncident(incident)
+    setPage("edit")
+  }
+
+  const handleCancelCreate = () => {
+    setEditingIncident(null)
+    setPage("list")
+  }
+
+  const handleSaved = () => {
+    setEditingIncident(null)
+    setListVersion((currentVersion) => currentVersion + 1)
+    setPage("list")
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <main className="min-h-screen bg-slate-950 text-slate-100 antialiased">
+      {page === "list" ? (
+        <IncidentListPage
+          key={listVersion}
+          onReportIncident={handleReportIncident}
+          onEditIncident={handleEditIncident}
+        />
+      ) : (
+        <NewIncidentPage
+          mode={page === "edit" ? "edit" : "create"}
+          incident={editingIncident}
+          onCancel={handleCancelCreate}
+          onSaved={handleSaved}
+        />
+      )}
+    </main>
   )
 }
 

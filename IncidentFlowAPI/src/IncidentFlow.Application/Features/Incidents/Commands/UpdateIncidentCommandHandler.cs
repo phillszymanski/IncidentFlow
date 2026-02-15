@@ -51,6 +51,8 @@ public class UpdateIncidentCommandHandler : IRequestHandler<UpdateIncidentComman
             incident.ResolvedAt = request.ResolvedAt;
         }
 
+        incident.UpdatedAt = DateTime.UtcNow;
+
         await _repository.UpdateAsync(incident, cancellationToken);
         return incident;
     }
