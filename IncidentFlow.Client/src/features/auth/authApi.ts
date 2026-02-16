@@ -5,6 +5,7 @@ export type AuthUser = {
   username: string;
   email: string;
   role: string;
+  permissions: string[];
 };
 
 type LoginResponse = {
@@ -16,6 +17,50 @@ type MeResponse = {
   username?: string;
   email?: string;
   role?: string;
+  permissions?: string[];
+};
+
+const getPermissionsForRole = (role: string): string[] => {
+  switch (role) {
+    case "Admin":
+      return [
+        "incidents:read",
+        "incidents:create",
+        "incidents:edit:any",
+        "incidents:status:any",
+        "incidents:severity:any",
+        "incidents:assign",
+        "incidents:delete",
+        "incidents:restore",
+        "incidents:audit:read",
+        "users:manage",
+        "roles:manage",
+        "dashboard:basic",
+        "dashboard:full"
+      ];
+    case "Manager":
+    case "Responder":
+      return [
+        "incidents:read",
+        "incidents:create",
+        "incidents:edit:any",
+        "incidents:status:any",
+        "incidents:severity:any",
+        "incidents:assign",
+        "dashboard:basic",
+        "dashboard:full"
+      ];
+    case "User":
+      return [
+        "incidents:read",
+        "incidents:create",
+        "incidents:edit:own",
+        "incidents:status:limited",
+        "dashboard:basic"
+      ];
+    default:
+      return ["incidents:read", "dashboard:basic"];
+  }
 };
 
 export const login = async (usernameOrEmail: string, password: string): Promise<AuthUser> => {
@@ -24,7 +69,15 @@ export const login = async (usernameOrEmail: string, password: string): Promise<
     password
   });
 
-  return response.data.user;
+  const currentUser = await getCurrentUser();
+  if (currentUser) {
+    return currentUser;
+  }
+
+  return {
+    ...response.data.user,
+    permissions: getPermissionsForRole(response.data.user.role)
+  };
 };
 
 export const register = async (input: {
@@ -55,7 +108,8 @@ export const getCurrentUser = async (): Promise<AuthUser | null> => {
       id: response.data.userId,
       username: response.data.username,
       email: response.data.email,
-      role: response.data.role
+      role: response.data.role,
+      permissions: response.data.permissions ?? getPermissionsForRole(response.data.role)
     };
   } catch {
     return null;

@@ -15,6 +15,7 @@ namespace IncidentFlow.Infrastructure.Persistence
         public DbSet<Incident> Incidents => Set<Incident>();
         public DbSet<User> Users => Set<User>();
         public DbSet<IncidentLog> IncidentLogs => Set<IncidentLog>();
+        public DbSet<Comment> Comments => Set<Comment>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -109,3 +109,4 @@ C:\Repos\IncidentFlow\IncidentFlowAPI\tests\IncidentFlow.UnitTests\obj\Debug\net
 C:\Repos\IncidentFlow\IncidentFlowAPI\tests\IncidentFlow.UnitTests\obj\Debug\net10.0\IncidentFlow.UnitTests.pdb
 C:\Repos\IncidentFlow\IncidentFlowAPI\tests\IncidentFlow.UnitTests\obj\Debug\net10.0\IncidentFlow.UnitTests.genruntimeconfig.cache
 C:\Repos\IncidentFlow\IncidentFlowAPI\tests\IncidentFlow.UnitTests\obj\Debug\net10.0\ref\IncidentFlow.UnitTests.dll
+C:\Repos\IncidentFlow\IncidentFlowAPI\tests\IncidentFlow.UnitTests\obj\Debug\net10.0\IncidentFlow.UnitTests.sourcelink.json

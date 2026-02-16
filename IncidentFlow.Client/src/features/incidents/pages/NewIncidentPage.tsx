@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import { createIncident, updateIncident } from "../incidentApi";
+import type { AuthUser } from "../../auth/authApi";
+import { createIncident, getAssignableUsers, updateIncident, type AssignableUser } from "../incidentApi";
 import { IncidentSeverity, type Incident } from "../types";
 
 type NewIncidentPageProps = {
+	currentUser: AuthUser;
 	onCancel: () => void;
 	onSaved: () => void;
 	mode?: "create" | "edit";
@@ -24,18 +26,24 @@ const normalizeSeverityOption = (rawSeverity: string) => {
 };
 
 export const NewIncidentPage = ({
+	currentUser,
 	onCancel,
 	onSaved,
 	mode = "create",
 	incident = null
 }: NewIncidentPageProps) => {
 	const isEditMode = mode === "edit";
+	const hasPermission = (permission: string) => currentUser.permissions.includes(permission);
+	const canAssign = hasPermission("incidents:assign");
+	const canChangeAnySeverity = hasPermission("incidents:severity:any");
 
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
 	const [severity, setSeverity] = useState<(typeof severityOptions)[number]>("Medium");
-	const [createdBy, setCreatedBy] = useState("11111111-1111-1111-1111-111111111111");
 	const [assignedTo, setAssignedTo] = useState("");
+	const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
+	const [assignableUsersLoading, setAssignableUsersLoading] = useState(false);
+	const [assignableUsersError, setAssignableUsersError] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -48,11 +56,35 @@ export const NewIncidentPage = ({
 	);
 
 	useEffect(() => {
+		const loadAssignableUsers = async () => {
+			if (!canAssign) {
+				setAssignableUsers([]);
+				setAssignableUsersError(null);
+				setAssignableUsersLoading(false);
+				return;
+			}
+
+			setAssignableUsersLoading(true);
+			setAssignableUsersError(null);
+
+			try {
+				const users = await getAssignableUsers();
+				setAssignableUsers(users);
+			} catch (loadError) {
+				setAssignableUsersError(loadError instanceof Error ? loadError.message : "Failed to load users.");
+			} finally {
+				setAssignableUsersLoading(false);
+			}
+		};
+
+		void loadAssignableUsers();
+	}, [canAssign]);
+
+	useEffect(() => {
 		if (isEditMode && incident) {
 			setTitle(incident.title);
 			setDescription(incident.description);
 			setSeverity(normalizeSeverityOption(incident.severity));
-			setCreatedBy(incident.createdBy);
 			setAssignedTo(incident.assignedTo ?? "");
 			setError(null);
 			return;
@@ -61,7 +93,6 @@ export const NewIncidentPage = ({
 		setTitle("");
 		setDescription("");
 		setSeverity("Medium");
-		setCreatedBy("11111111-1111-1111-1111-111111111111");
 		setAssignedTo("");
 		setError(null);
 	}, [incident, isEditMode]);
@@ -69,8 +100,8 @@ export const NewIncidentPage = ({
 	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 
-		if (!title.trim() || !description.trim() || !createdBy.trim()) {
-			setError("Title, description, and created by are required.");
+		if (!title.trim() || !description.trim()) {
+			setError("Title and description are required.");
 			return;
 		}
 
@@ -79,18 +110,28 @@ export const NewIncidentPage = ({
 
 		try {
 			if (isEditMode && incident) {
-				await updateIncident(incident.id, {
+				const updatePayload: Parameters<typeof updateIncident>[1] = {
 					title: title.trim(),
-					description: description.trim(),
-					severity: IncidentSeverity[severity],
-					assignedTo: assignedTo.trim() || null
+					description: description.trim()
+				};
+
+				if (canChangeAnySeverity) {
+					updatePayload.severity = IncidentSeverity[severity];
+				}
+
+				if (canAssign) {
+					updatePayload.assignedTo = assignedTo.trim() || null;
+				}
+
+				await updateIncident(incident.id, {
+					...updatePayload
 				});
 			} else {
 				await createIncident({
 					title: title.trim(),
 					description: description.trim(),
 					severity: IncidentSeverity[severity],
-					createdBy: createdBy.trim(),
+					createdBy: currentUser.id,
 					assignedTo: assignedTo.trim() || null
 				});
 			}
@@ -167,6 +208,7 @@ export const NewIncidentPage = ({
 								id="severity"
 								value={severity}
 								onChange={(event) => setSeverity(event.target.value as (typeof severityOptions)[number])}
+								disabled={isEditMode && !canChangeAnySeverity}
 								className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-sky-400/70 focus:ring-2 focus:ring-sky-400/30"
 							>
 								{severityOptions.map((option) => (
@@ -179,31 +221,26 @@ export const NewIncidentPage = ({
 
 						<div>
 							<label htmlFor="assignedTo" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-300">
-								Assigned User ID (optional)
+								Assigned User (optional)
 							</label>
-							<input
+							<select
 								id="assignedTo"
 								value={assignedTo}
 								onChange={(event) => setAssignedTo(event.target.value)}
+								disabled={!canAssign || assignableUsersLoading}
 								className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-sky-400/70 focus:ring-2 focus:ring-sky-400/30"
-								placeholder="GUID"
-							/>
+							>
+								<option value="">Unassigned</option>
+								{assignableUsers.map((user) => (
+									<option key={user.id} value={user.id}>
+										{user.fullName} ({user.username}) - {user.role}
+									</option>
+								))}
+							</select>
+							{assignableUsersError ? (
+								<p className="mt-2 text-xs text-rose-300">{assignableUsersError}</p>
+							) : null}
 						</div>
-					</div>
-
-					<div>
-						<label htmlFor="createdBy" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-300">
-							Created By User ID
-						</label>
-						<input
-							id="createdBy"
-							value={createdBy}
-							onChange={(event) => setCreatedBy(event.target.value)}
-							disabled={isEditMode}
-							className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-sky-400/70 focus:ring-2 focus:ring-sky-400/30"
-							placeholder="GUID"
-							required
-						/>
 					</div>
 
 					<div className="mt-2 flex flex-wrap items-center gap-3">

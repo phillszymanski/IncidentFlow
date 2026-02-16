@@ -22,6 +22,34 @@ namespace IncidentFlow.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("IncidentFlow.Domain.Entities.Comment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("IncidentId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("IncidentId");
+
+                    b.ToTable("Comments");
+                });
+
             modelBuilder.Entity("IncidentFlow.Domain.Entities.Incident", b =>
                 {
                     b.Property<Guid>("Id")
@@ -37,9 +65,15 @@ namespace IncidentFlow.Infrastructure.Migrations
                     b.Property<Guid>("CreatedBy")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("ResolvedAt")
                         .HasColumnType("timestamp with time zone");
@@ -128,6 +162,25 @@ namespace IncidentFlow.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("IncidentFlow.Domain.Entities.Comment", b =>
+                {
+                    b.HasOne("IncidentFlow.Domain.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("IncidentFlow.Domain.Entities.Incident", "Incident")
+                        .WithMany("Comments")
+                        .HasForeignKey("IncidentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Incident");
+                });
+
             modelBuilder.Entity("IncidentFlow.Domain.Entities.IncidentLog", b =>
                 {
                     b.HasOne("IncidentFlow.Domain.Entities.Incident", "Incident")
@@ -149,6 +202,8 @@ namespace IncidentFlow.Infrastructure.Migrations
 
             modelBuilder.Entity("IncidentFlow.Domain.Entities.Incident", b =>
                 {
+                    b.Navigation("Comments");
+
                     b.Navigation("IncidentLogs");
                 });
 #pragma warning restore 612, 618

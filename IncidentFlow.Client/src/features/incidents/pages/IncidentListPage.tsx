@@ -1,10 +1,14 @@
 
 import { useMemo, useState } from "react";
+import type { AuthUser } from "../../auth/authApi";
 import { useIncidents } from "../../../hooks/useIncidents";
 import { IncidentDetails } from "../components/IncidentDetails";
+import { IncidentDashboard } from "../components/IncidentDashboard";
+import { deleteIncident } from "../incidentApi";
 import { type Incident, IncidentStatus } from "../types";
 
 type IncidentListPageProps = {
+  currentUser: AuthUser;
   onReportIncident: () => void;
   onEditIncident: (incident: Incident) => void;
 };
@@ -24,14 +28,63 @@ const normalizeStatus = (rawStatus: string) => {
   return rawStatus;
 };
 
-export const IncidentListPage = ({ onReportIncident, onEditIncident }: IncidentListPageProps) => {
+export const IncidentListPage = ({ currentUser, onReportIncident, onEditIncident }: IncidentListPageProps) => {
   const { incidents, loading, error, refetch } = useIncidents();
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
+
+  const hasPermission = (permission: string) => currentUser.permissions.includes(permission);
+  const canCreateIncident = hasPermission("incidents:create");
+  const canViewAuditLogs = hasPermission("incidents:audit:read");
+  const canDeleteIncident = hasPermission("incidents:delete");
+  const canEditAny = hasPermission("incidents:edit:any");
+  const canEditOwn = hasPermission("incidents:edit:own");
+  const canSetAnyStatus = hasPermission("incidents:status:any");
+  const canSetOwnStatus = hasPermission("incidents:status:limited");
+  const dashboardMode = hasPermission("dashboard:full") ? "full" : "basic";
 
   const selectedIncident = useMemo(
     () => incidents.find((incident) => incident.id === selectedIncidentId) ?? null,
     [incidents, selectedIncidentId]
   );
+
+  const isSelectedIncidentOwned = useMemo(() => {
+    if (!selectedIncident) {
+      return false;
+    }
+
+    return selectedIncident.createdBy === currentUser.id || selectedIncident.assignedTo === currentUser.id;
+  }, [currentUser.id, selectedIncident]);
+
+  const canEditSelectedIncident = useMemo(() => {
+    if (!selectedIncident) {
+      return false;
+    }
+
+    return canEditAny || (canEditOwn && selectedIncident.createdBy === currentUser.id);
+  }, [canEditAny, canEditOwn, currentUser.id, selectedIncident]);
+
+  const canChangeSelectedIncidentStatus = useMemo(() => {
+    if (!selectedIncident) {
+      return false;
+    }
+
+    return canSetAnyStatus || (canSetOwnStatus && isSelectedIncidentOwned);
+  }, [canSetAnyStatus, canSetOwnStatus, isSelectedIncidentOwned, selectedIncident]);
+
+  const handleDeleteSelectedIncident = async () => {
+    if (!selectedIncident || !canDeleteIncident) {
+      return;
+    }
+
+    const confirmed = window.confirm("Are you sure you want to delete this incident?");
+    if (!confirmed) {
+      return;
+    }
+
+    await deleteIncident(selectedIncident.id);
+    setSelectedIncidentId(null);
+    await refetch();
+  };
 
   if (loading) {
     return (
@@ -65,7 +118,7 @@ export const IncidentListPage = ({ onReportIncident, onEditIncident }: IncidentL
   }
 
   return (
-    <section className="mx-auto w-full max-w-5xl px-6 py-12">
+    <section className="mx-auto w-full max-w-7xl px-6 py-12">
       <div className="relative overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/70 p-8 shadow-2xl shadow-slate-950/60 backdrop-blur">
         <div className="pointer-events-none absolute -right-20 -top-16 h-56 w-56 rounded-full bg-sky-500/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-20 -left-16 h-56 w-56 rounded-full bg-indigo-500/15 blur-3xl" />
@@ -77,13 +130,15 @@ export const IncidentListPage = ({ onReportIncident, onEditIncident }: IncidentL
             <p className="mt-2 text-sm text-slate-300">Monitor and track active operational issues.</p>
           </div>
 
-          <button
-            type="button"
-            onClick={onReportIncident}
-            className="inline-flex items-center rounded-xl bg-white/100 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-sky-300 cursor-pointer"
-          >
-            Report an Incident
-          </button>
+          {canCreateIncident ? (
+            <button
+              type="button"
+              onClick={onReportIncident}
+              className="inline-flex items-center rounded-xl bg-white/100 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-sky-300 cursor-pointer"
+            >
+              Report an Incident
+            </button>
+          ) : null}
 
           <button
             type="button"
@@ -94,12 +149,14 @@ export const IncidentListPage = ({ onReportIncident, onEditIncident }: IncidentL
           </button>
         </div>
 
+        <IncidentDashboard incidents={incidents} mode={dashboardMode} />
+
         {incidents.length === 0 ? (
           <div className="relative mt-8 rounded-2xl border border-dashed border-slate-700/90 bg-slate-900/40 px-6 py-10 text-center">
             <p className="text-sm text-slate-300">No incidents found.</p>
           </div>
         ) : (
-          <div className="relative mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-start">
+          <div className="relative mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,2fr)] lg:items-start">
             <ul className="grid gap-4">
               {incidents.map((incident) => {
                 const displayStatus = normalizeStatus(incident.status);
@@ -140,8 +197,16 @@ export const IncidentListPage = ({ onReportIncident, onEditIncident }: IncidentL
 
             <IncidentDetails
               incident={selectedIncident}
+              canViewTimeline={canViewAuditLogs}
+              canDelete={canDeleteIncident}
+              canEdit={canEditSelectedIncident}
+              canChangeStatus={canChangeSelectedIncidentStatus}
+              onDelete={() => {
+                void handleDeleteSelectedIncident();
+              }}
+              onIncidentUpdated={refetch}
               onEdit={() => {
-                if (selectedIncident) {
+                if (selectedIncident && canEditSelectedIncident) {
                   onEditIncident(selectedIncident);
                 }
               }}

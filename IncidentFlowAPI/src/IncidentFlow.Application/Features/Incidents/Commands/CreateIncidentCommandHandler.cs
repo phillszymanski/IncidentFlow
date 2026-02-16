@@ -8,10 +8,14 @@ public class CreateIncidentCommandHandler
     : IRequestHandler<CreateIncidentCommand, Guid>
 {
     private readonly IIncidentRepository _repository;
+    private readonly IIncidentLogRepository _incidentLogRepository;
 
-    public CreateIncidentCommandHandler(IIncidentRepository repository)
+    public CreateIncidentCommandHandler(
+        IIncidentRepository repository,
+        IIncidentLogRepository incidentLogRepository)
     {
         _repository = repository;
+        _incidentLogRepository = incidentLogRepository;
     }
 
     public async Task<Guid> Handle(CreateIncidentCommand request, CancellationToken cancellationToken)
@@ -27,6 +31,18 @@ public class CreateIncidentCommandHandler
         };
 
         await _repository.AddAsync(incident, cancellationToken);
+
+        var logDetails = $"Created incident with severity '{incident.Severity}'"
+            + (incident.AssignedTo.HasValue ? $" and assignment to '{incident.AssignedTo}'" : ".");
+
+        await _incidentLogRepository.AddAsync(new IncidentLog
+        {
+            IncidentId = incident.Id,
+            Action = "Create",
+            Details = logDetails,
+            CreatedAt = DateTime.UtcNow,
+            PerformedByUserId = request.CreatedBy
+        }, cancellationToken);
 
         return incident.Id;
     }

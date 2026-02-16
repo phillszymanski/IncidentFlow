@@ -1,5 +1,6 @@
 using IncidentFlow.Application.Features.Incidents.Commands;
 using IncidentFlow.Application.Interfaces;
+using IncidentFlow.API.Authorization;
 using IncidentFlow.API.Jobs;
 using IncidentFlow.API.Services;
 using IncidentFlow.Infrastructure.Persistence;
@@ -64,9 +65,17 @@ builder.Services
 
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("CanReadIncidents", policy => policy.RequireClaim("permission", "incidents:read"));
-    options.AddPolicy("CanWriteIncidents", policy => policy.RequireClaim("permission", "incidents:write"));
-    options.AddPolicy("CanManageUsers", policy => policy.RequireClaim("permission", "users:manage"));
+    options.AddPolicy(PolicyConstants.CanReadIncidents, policy => policy.RequireClaim("permission", PermissionConstants.IncidentsRead));
+    options.AddPolicy(PolicyConstants.CanCreateIncidents, policy => policy.RequireClaim("permission", PermissionConstants.IncidentsCreate));
+    options.AddPolicy(PolicyConstants.CanAssignIncidents, policy => policy.RequireClaim("permission", PermissionConstants.IncidentsAssign));
+    options.AddPolicy("CanWriteIncidents", policy => policy.RequireAssertion(context =>
+        context.User.HasClaim("permission", PermissionConstants.IncidentsEditAny) ||
+        context.User.HasClaim("permission", PermissionConstants.IncidentsEditOwn) ||
+        context.User.HasClaim("permission", PermissionConstants.IncidentsCreate)));
+    options.AddPolicy(PolicyConstants.CanManageUsers, policy => policy.RequireClaim("permission", PermissionConstants.UsersManage));
+    options.AddPolicy(PolicyConstants.CanReadAuditLogs, policy => policy.RequireClaim("permission", PermissionConstants.IncidentsAuditRead));
+    options.AddPolicy(PolicyConstants.CanDeleteIncidents, policy => policy.RequireClaim("permission", PermissionConstants.IncidentsDelete));
+    options.AddPolicy(PolicyConstants.CanRestoreIncidents, policy => policy.RequireClaim("permission", PermissionConstants.IncidentsRestore));
 });
 
 builder.Services.AddScoped<IPasswordHashService, PasswordHashService>();
@@ -88,6 +97,9 @@ builder.Services.AddScoped<IUserRepository>(provider =>
 
 builder.Services.AddScoped<IIncidentLogRepository>(provider =>
     new IncidentLogRepository(provider.GetRequiredService<IncidentFlowDbContext>()));
+
+builder.Services.AddScoped<ICommentRepository>(provider =>
+    new CommentRepository(provider.GetRequiredService<IncidentFlowDbContext>()));
 
 builder.Services.AddHostedService<IncidentStartupSeedJob>();
 

@@ -99,11 +99,13 @@ function App() {
       {page === "list" ? (
         <IncidentListPage
           key={listVersion}
+          currentUser={currentUser}
           onReportIncident={handleReportIncident}
           onEditIncident={handleEditIncident}
         />
       ) : (
         <NewIncidentPage
+          currentUser={currentUser}
           mode={page === "edit" ? "edit" : "create"}
           incident={editingIncident}
           onCancel={handleCancelCreate}

@@ -1,4 +1,5 @@
 using IncidentFlow.API.Contracts.Incidents;
+using IncidentFlow.API.Authorization;
 using IncidentFlow.Application.Features.Incidents.Commands;
 using IncidentFlow.Application.Features.Incidents.Queries;
 using MediatR;
@@ -19,7 +20,7 @@ namespace IncidentFlow.API.Controllers
         }
 
         // GET: api/Incident
-        [Authorize(Policy = "CanReadIncidents")]
+        [Authorize(Policy = PolicyConstants.CanReadIncidents)]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -29,7 +30,7 @@ namespace IncidentFlow.API.Controllers
         }
 
         // GET: api/Incident/{id}
-        [Authorize(Policy = "CanReadIncidents")]
+        [Authorize(Policy = PolicyConstants.CanReadIncidents)]
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> Get(Guid id)
         {
@@ -40,12 +41,17 @@ namespace IncidentFlow.API.Controllers
         }
 
         // POST: api/Incident
-        [Authorize(Policy = "CanWriteIncidents")]
+        [Authorize(Policy = PolicyConstants.CanCreateIncidents)]
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] IncidentCreateDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
+
+            if (dto.AssignedTo.HasValue && !User.HasClaim("permission", PermissionConstants.IncidentsAssign))
+            {
+                return Forbid();
+            }
 
             var userIdClaim = User.FindFirst("userId")?.Value;
             if (!Guid.TryParse(userIdClaim, out var createdByUserId))
@@ -69,13 +75,68 @@ namespace IncidentFlow.API.Controllers
         }
 
         // PUT: api/Incident/{id}
-        [Authorize(Policy = "CanWriteIncidents")]
+        [Authorize(Policy = PolicyConstants.CanReadIncidents)]
         [HttpPut("{id:guid}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] IncidentUpdateDto dto)
         {
+            var userIdClaim = User.FindFirst("userId")?.Value;
+            if (!Guid.TryParse(userIdClaim, out var performedByUserId))
+            {
+                return Unauthorized("Missing authenticated user context.");
+            }
+
+            var currentIncident = await _mediator.Send(new GetIncidentByIdQuery(id));
+            if (currentIncident is null)
+            {
+                return NotFound();
+            }
+
+            var canEditAny = User.HasClaim("permission", PermissionConstants.IncidentsEditAny);
+            var canEditOwn = User.HasClaim("permission", PermissionConstants.IncidentsEditOwn);
+            var isOwnedIncident = currentIncident.CreatedBy == performedByUserId || currentIncident.AssignedTo == performedByUserId;
+
+            var isUpdatingStatusOnly = dto.Status.HasValue
+                && string.IsNullOrWhiteSpace(dto.Title)
+                && string.IsNullOrWhiteSpace(dto.Description)
+                && !dto.Severity.HasValue
+                && !dto.AssignedTo.HasValue;
+
+            if (!isUpdatingStatusOnly && !canEditAny)
+            {
+                if (!canEditOwn || currentIncident.CreatedBy != performedByUserId)
+                {
+                    return Forbid();
+                }
+            }
+
+            if (dto.AssignedTo.HasValue && !User.HasClaim("permission", PermissionConstants.IncidentsAssign))
+            {
+                return Forbid();
+            }
+
+            if (dto.Severity.HasValue && !User.HasClaim("permission", PermissionConstants.IncidentsSeverityAny))
+            {
+                return Forbid();
+            }
+
+            if (dto.Status.HasValue)
+            {
+                var canSetAnyStatus = User.HasClaim("permission", PermissionConstants.IncidentsStatusAny);
+                if (!canSetAnyStatus)
+                {
+                    var canSetLimitedStatus = User.HasClaim("permission", PermissionConstants.IncidentsStatusLimited);
+
+                    if (!canSetLimitedStatus || !isOwnedIncident)
+                    {
+                        return Forbid();
+                    }
+                }
+            }
+
             var incident = await _mediator.Send(new UpdateIncidentCommand
             {
                 Id = id,
+                PerformedByUserId = performedByUserId,
                 Title = dto.Title,
                 Description = dto.Description,
                 Status = dto.Status,
@@ -89,11 +150,36 @@ namespace IncidentFlow.API.Controllers
         }
 
         // DELETE: api/Incident/{id}
-        [Authorize(Policy = "CanWriteIncidents")]
+        [Authorize(Policy = PolicyConstants.CanDeleteIncidents)]
         [HttpDelete("{id:guid}")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            await _mediator.Send(new DeleteIncidentCommand(id));
+            var userIdClaim = User.FindFirst("userId")?.Value;
+            if (!Guid.TryParse(userIdClaim, out var performedByUserId))
+            {
+                return Unauthorized("Missing authenticated user context.");
+            }
+
+            await _mediator.Send(new DeleteIncidentCommand(id, performedByUserId));
+            return NoContent();
+        }
+
+        [Authorize(Policy = PolicyConstants.CanRestoreIncidents)]
+        [HttpPost("{id:guid}/restore")]
+        public async Task<IActionResult> Restore(Guid id)
+        {
+            var userIdClaim = User.FindFirst("userId")?.Value;
+            if (!Guid.TryParse(userIdClaim, out var performedByUserId))
+            {
+                return Unauthorized("Missing authenticated user context.");
+            }
+
+            var restored = await _mediator.Send(new RestoreIncidentCommand(id, performedByUserId));
+            if (!restored)
+            {
+                return NotFound();
+            }
+
             return NoContent();
         }
     }

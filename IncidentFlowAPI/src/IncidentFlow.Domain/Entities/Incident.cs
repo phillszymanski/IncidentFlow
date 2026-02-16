@@ -20,9 +20,12 @@ public class Incident : BaseEntity
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public DateTime? ResolvedAt { get; set; }
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
     public IncidentStatus Status { get; set; }
     public SeverityLevel Severity { get; set; }
     public Guid CreatedBy { get; set; }
     public Guid? AssignedTo { get; set; }
     public List<IncidentLog> IncidentLogs { get; set; } = new List<IncidentLog>();
+    public List<Comment> Comments { get; set; } = new List<Comment>();
 }

@@ -41,6 +41,16 @@ public class IncidentLogRepository : IIncidentLogRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<List<IncidentLog>> GetByIncidentIdAsync(Guid incidentId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.IncidentLogs
+            .Where(x => x.IncidentId == incidentId)
+            .Include(x => x.Incident)
+            .Include(x => x.PerformedByUser)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var incidentLog = await _dbContext.IncidentLogs.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);

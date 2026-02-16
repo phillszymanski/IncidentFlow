@@ -1,4 +1,5 @@
 using IncidentFlow.API.Contracts.Users;
+using IncidentFlow.API.Authorization;
 using IncidentFlow.API.Services;
 using IncidentFlow.Application.Features.Users.Commands;
 using IncidentFlow.Application.Features.Users.Queries;
@@ -21,7 +22,7 @@ public class UserController : BaseController
         _passwordHashService = passwordHashService;
     }
 
-    [Authorize(Policy = "CanManageUsers")]
+    [Authorize(Policy = PolicyConstants.CanManageUsers)]
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -30,7 +31,25 @@ public class UserController : BaseController
         return HandleResult(dto);
     }
 
-    [Authorize(Policy = "CanManageUsers")]
+    [Authorize(Policy = PolicyConstants.CanAssignIncidents)]
+    [HttpGet("assignable")]
+    public async Task<IActionResult> GetAssignable()
+    {
+        var users = await _mediator.Send(new GetAllUsersQuery());
+        var dto = users.Select(x => x.ToResponseDto());
+        return HandleResult(dto);
+    }
+
+    [Authorize(Policy = PolicyConstants.CanReadIncidents)]
+    [HttpGet("directory")]
+    public async Task<IActionResult> GetDirectory()
+    {
+        var users = await _mediator.Send(new GetAllUsersQuery());
+        var dto = users.Select(x => x.ToResponseDto());
+        return HandleResult(dto);
+    }
+
+    [Authorize(Policy = PolicyConstants.CanManageUsers)]
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id)
     {
@@ -51,7 +70,7 @@ public class UserController : BaseController
             return BadRequest("Password is required.");
 
         var requestedRole = dto.Role;
-        var canManageUsers = User.HasClaim("permission", "users:manage");
+        var canManageUsers = User.HasClaim("permission", PermissionConstants.UsersManage);
         var effectiveRole = canManageUsers ? requestedRole : "User";
 
         var id = await _mediator.Send(new CreateUserCommand
@@ -67,7 +86,7 @@ public class UserController : BaseController
         return CreatedAtAction(nameof(Get), new { id }, created?.ToResponseDto());
     }
 
-    [Authorize(Policy = "CanManageUsers")]
+    [Authorize(Policy = PolicyConstants.CanManageUsers)]
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UserUpdateDto dto)
     {
@@ -87,7 +106,7 @@ public class UserController : BaseController
         return NoContent();
     }
 
-    [Authorize(Policy = "CanManageUsers")]
+    [Authorize(Policy = PolicyConstants.CanManageUsers)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {

@@ -22,8 +22,27 @@ export interface IncidentCreateInput {
 export interface IncidentUpdateInput {
   title?: string;
   description?: string;
+  status?: number;
   severity?: number;
   assignedTo?: string | null;
+  resolvedAt?: string | null;
+}
+
+export interface IncidentComment {
+  id: string;
+  incidentId: string;
+  content: string;
+  createdAt: string;
+  createdByUserId: string;
+}
+
+export interface IncidentLog {
+  id: string;
+  incidentId: string;
+  action: string;
+  details: string;
+  createdAt: string;
+  performedByUserId: string;
 }
 
 export enum IncidentStatus

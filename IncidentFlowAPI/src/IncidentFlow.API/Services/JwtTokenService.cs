@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using IncidentFlow.API.Authorization;
 using IncidentFlow.Domain.Entities;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -48,11 +49,46 @@ public sealed class JwtTokenService : IJwtTokenService
     {
         return role switch
         {
-            "Admin" => ["incidents:read", "incidents:write", "users:manage"],
-            "Responder" => ["incidents:read", "incidents:write"],
-            "User" => ["incidents:read", "incidents:write"],
-            "Viewer" => ["incidents:read"],
-            _ => ["incidents:read"]
+            "Admin" =>
+            [
+                PermissionConstants.IncidentsRead,
+                PermissionConstants.IncidentsCreate,
+                PermissionConstants.IncidentsEditAny,
+                PermissionConstants.IncidentsStatusAny,
+                PermissionConstants.IncidentsSeverityAny,
+                PermissionConstants.IncidentsAssign,
+                PermissionConstants.IncidentsDelete,
+                PermissionConstants.IncidentsRestore,
+                PermissionConstants.IncidentsAuditRead,
+                PermissionConstants.UsersManage,
+                PermissionConstants.RolesManage,
+                PermissionConstants.DashboardBasic,
+                PermissionConstants.DashboardFull
+            ],
+            "Manager" or "Responder" =>
+            [
+                PermissionConstants.IncidentsRead,
+                PermissionConstants.IncidentsCreate,
+                PermissionConstants.IncidentsEditAny,
+                PermissionConstants.IncidentsStatusAny,
+                PermissionConstants.IncidentsSeverityAny,
+                PermissionConstants.IncidentsAssign,
+                PermissionConstants.DashboardBasic,
+                PermissionConstants.DashboardFull
+            ],
+            "User" =>
+            [
+                PermissionConstants.IncidentsRead,
+                PermissionConstants.IncidentsCreate,
+                PermissionConstants.IncidentsEditOwn,
+                PermissionConstants.IncidentsStatusLimited,
+                PermissionConstants.DashboardBasic
+            ],
+            _ =>
+            [
+                PermissionConstants.IncidentsRead,
+                PermissionConstants.DashboardBasic
+            ]
         };
     }
 }

@@ -13,6 +13,9 @@ namespace IncidentFlow.Application.Interfaces
         // Get incident by Id
         Task<Incident?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+        // Get incident by Id including soft-deleted rows
+        Task<Incident?> GetByIdIncludingDeletedAsync(Guid id, CancellationToken cancellationToken = default);
+
         // List all incidents (optional: add paging/filters later)
         Task<List<Incident>> GetAllAsync(CancellationToken cancellationToken = default);
 

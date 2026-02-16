@@ -28,6 +28,14 @@ namespace IncidentFlow.Infrastructure.Persistence.Repositories
         public async Task<Incident?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
             return await _dbContext.Incidents
+                .Where(i => !i.IsDeleted)
+                .Include(i => i.IncidentLogs)
+                .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+        }
+
+        public async Task<Incident?> GetByIdIncludingDeletedAsync(Guid id, CancellationToken cancellationToken = default)
+        {
+            return await _dbContext.Incidents
                 .Include(i => i.IncidentLogs)
                 .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
         }
@@ -35,6 +43,7 @@ namespace IncidentFlow.Infrastructure.Persistence.Repositories
         public async Task<List<Incident>> GetAllAsync(CancellationToken cancellationToken = default)
         {
             return await _dbContext.Incidents
+                .Where(i => !i.IsDeleted)
                 .Include(i => i.IncidentLogs)
                 .ToListAsync(cancellationToken);
         }
@@ -42,14 +51,27 @@ namespace IncidentFlow.Infrastructure.Persistence.Repositories
         public async Task<List<Incident>> GetByStatusAsync(IncidentStatus status, CancellationToken cancellationToken = default)
         {
             return await _dbContext.Incidents
-                .Where(i => i.Status == status)
+                .Where(i => i.Status == status && !i.IsDeleted)
                 .Include(i => i.IncidentLogs)
                 .ToListAsync(cancellationToken);
         }
 
-        public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+        public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            throw new NotImplementedException();
+            var incident = await _dbContext.Incidents.FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+            if (incident is null)
+            {
+                return;
+            }
+
+            if (!incident.IsDeleted)
+            {
+                incident.IsDeleted = true;
+                incident.DeletedAt = DateTime.UtcNow;
+                incident.UpdatedAt = DateTime.UtcNow;
+                _dbContext.Incidents.Update(incident);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
         }
     }
 }

@@ -1,13 +1,16 @@
 using IncidentFlow.API.Contracts.IncidentLogs;
+using IncidentFlow.API.Authorization;
 using IncidentFlow.Application.Features.IncidentLogs.Commands;
 using IncidentFlow.Application.Features.IncidentLogs.Queries;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace IncidentFlow.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Policy = PolicyConstants.CanReadAuditLogs)]
 public class IncidentLogController : BaseController
 {
     private readonly IMediator _mediator;
@@ -32,6 +35,14 @@ public class IncidentLogController : BaseController
         if (incidentLog is null) return NotFound();
 
         return HandleResult(incidentLog.ToResponseDto());
+    }
+
+    [HttpGet("incident/{incidentId:guid}")]
+    public async Task<IActionResult> GetByIncident(Guid incidentId)
+    {
+        var logs = await _mediator.Send(new GetIncidentLogsByIncidentIdQuery(incidentId));
+        var dto = logs.Select(x => x.ToResponseDto());
+        return HandleResult(dto);
     }
 
     [HttpPost]
