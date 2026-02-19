@@ -1,4 +1,5 @@
 using IncidentFlow.API.Contracts.Comments;
+using IncidentFlow.API.Authorization;
 using IncidentFlow.Application.Features.Comments.Commands;
 using IncidentFlow.Application.Features.Comments.Queries;
 using MediatR;
@@ -68,6 +69,24 @@ public class CommentController : BaseController
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] CommentUpdateDto dto)
     {
+        var userIdClaim = User.FindFirst("userId")?.Value;
+        if (!Guid.TryParse(userIdClaim, out var performedByUserId))
+        {
+            return Unauthorized("Missing authenticated user context.");
+        }
+
+        var existingComment = await _mediator.Send(new GetCommentByIdQuery(id));
+        if (existingComment is null)
+        {
+            return NotFound();
+        }
+
+        var canEditAny = User.HasClaim("permission", PermissionConstants.IncidentsEditAny);
+        if (!canEditAny && existingComment.CreatedByUserId != performedByUserId)
+        {
+            return Forbid();
+        }
+
         var comment = await _mediator.Send(new UpdateCommentCommand
         {
             Id = id,
@@ -82,6 +101,24 @@ public class CommentController : BaseController
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
+        var userIdClaim = User.FindFirst("userId")?.Value;
+        if (!Guid.TryParse(userIdClaim, out var performedByUserId))
+        {
+            return Unauthorized("Missing authenticated user context.");
+        }
+
+        var existingComment = await _mediator.Send(new GetCommentByIdQuery(id));
+        if (existingComment is null)
+        {
+            return NotFound();
+        }
+
+        var canEditAny = User.HasClaim("permission", PermissionConstants.IncidentsEditAny);
+        if (!canEditAny && existingComment.CreatedByUserId != performedByUserId)
+        {
+            return Forbid();
+        }
+
         await _mediator.Send(new DeleteCommentCommand(id));
         return NoContent();
     }

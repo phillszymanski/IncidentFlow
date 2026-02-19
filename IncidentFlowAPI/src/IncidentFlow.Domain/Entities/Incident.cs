@@ -12,7 +12,7 @@ public class Incident : BaseEntity
         UpdatedAt = CreatedAt;
         CreatedBy = createdBy;
 
-        AddDomainEvent(new IncidentCreatedEvent(Guid.NewGuid()));
+        AddDomainEvent(new IncidentCreatedEvent(Id));
     }
 
     public string Title { get; set; } = string.Empty;

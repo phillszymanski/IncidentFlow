@@ -11,9 +11,6 @@ public sealed class IncidentStartupSeedJob : IHostedService
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<IncidentStartupSeedJob> _logger;
     private readonly IncidentSeedOptions _seedOptions;
-    private const string AdminEmail = "admin@test.com";
-    private const string AdminPassword = "adminpass";
-    private const string AdminUsername = "admin";
     private static readonly string[] CommentTemplates =
     [
         "Investigating root cause.",
@@ -69,36 +66,29 @@ public sealed class IncidentStartupSeedJob : IHostedService
 
         using var scope = _serviceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<IncidentFlowDbContext>();
-        var passwordHashService = scope.ServiceProvider.GetRequiredService<IPasswordHashService>();
 
         await dbContext.Database.MigrateAsync(cancellationToken);
 
-        var adminUser = await dbContext.Users
-            .FirstOrDefaultAsync(user => user.Email.ToLower() == AdminEmail.ToLower(), cancellationToken);
+        var seededUserFallbackId = await EnsureConfiguredUsersAsync(scope.ServiceProvider, dbContext, cancellationToken);
 
-        if (adminUser is null)
+        Guid? fallbackUserId = null;
+        if (_seedOptions.SeedAdminUser)
         {
-            adminUser = new User
-            {
-                Username = AdminUsername,
-                FullName = "System Administrator",
-                Email = AdminEmail,
-                Role = "Admin",
-                PasswordHash = passwordHashService.HashPassword(AdminPassword),
-                CreatedAt = DateTime.UtcNow
-            };
-
-            await dbContext.Users.AddAsync(adminUser, cancellationToken);
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            _logger.LogInformation("Seeded default admin user {AdminEmail}.", AdminEmail);
-        }
-        else
-        {
-            _logger.LogInformation("Admin user {AdminEmail} already exists. Skipping admin seed.", AdminEmail);
+            fallbackUserId = await EnsureConfiguredAdminUserAsync(scope.ServiceProvider, dbContext, cancellationToken);
         }
 
-        var actingUserId = await ResolveSeedUserIdAsync(dbContext, adminUser.Id, cancellationToken);
+        if (!fallbackUserId.HasValue)
+        {
+            fallbackUserId = seededUserFallbackId;
+        }
+
+        var actingUserId = await ResolveSeedUserIdAsync(dbContext, fallbackUserId, cancellationToken);
+        if (!actingUserId.HasValue)
+        {
+            _logger.LogWarning(
+                "No valid seed owner found. Configure IncidentSeed:SeedUserId, seed at least one user, or enable IncidentSeed:SeedAdminUser with credentials.");
+            return;
+        }
 
         var seedItems = _seedOptions.Items
             .Where(item => !string.IsNullOrWhiteSpace(item.Title))
@@ -148,7 +138,7 @@ public sealed class IncidentStartupSeedJob : IHostedService
                 title: $"{template.Title} #{existingIncidentCount + index + 1}",
                 description: template.Description,
                 severity: selectedSeverity,
-                createdBy: actingUserId);
+                createdBy: actingUserId.Value);
 
             incident.CreatedAt = createdAt;
             incident.UpdatedAt = createdAt;
@@ -199,7 +189,7 @@ public sealed class IncidentStartupSeedJob : IHostedService
                     Action = action,
                     Details = $"{action} during seed generation ({existingLogsForIncident + logIndex + 1}/{logsPerIncident}).",
                     CreatedAt = DateTime.UtcNow.AddMinutes(-random.Next(5, 24 * 60)),
-                    PerformedByUserId = actingUserId
+                    PerformedByUserId = actingUserId.Value
                 });
             }
         }
@@ -214,7 +204,7 @@ public sealed class IncidentStartupSeedJob : IHostedService
                     IncidentId = incident.Id,
                     Content = CommentTemplates[random.Next(CommentTemplates.Length)],
                     CreatedAt = DateTime.UtcNow.AddMinutes(-random.Next(5, 24 * 60)),
-                    CreatedByUserId = actingUserId
+                    CreatedByUserId = actingUserId.Value
                 });
             }
         }
@@ -240,9 +230,9 @@ public sealed class IncidentStartupSeedJob : IHostedService
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private async Task<Guid> ResolveSeedUserIdAsync(
+    private async Task<Guid?> ResolveSeedUserIdAsync(
         IncidentFlowDbContext dbContext,
-        Guid fallbackUserId,
+        Guid? fallbackUserId,
         CancellationToken cancellationToken)
     {
         var configuredSeedUserExists = await dbContext.Users
@@ -254,10 +244,194 @@ public sealed class IncidentStartupSeedJob : IHostedService
             return _seedOptions.SeedUserId;
         }
 
+        if (fallbackUserId.HasValue)
+        {
+            _logger.LogWarning(
+                "Configured IncidentSeed:SeedUserId {SeedUserId} was not found. Falling back to configured admin seed user.",
+                _seedOptions.SeedUserId);
+
+            return fallbackUserId.Value;
+        }
+
+        var firstUserId = await dbContext.Users
+            .AsNoTracking()
+            .OrderBy(user => user.CreatedAt)
+            .Select(user => (Guid?)user.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (firstUserId.HasValue)
+        {
+            _logger.LogWarning(
+                "Configured IncidentSeed:SeedUserId {SeedUserId} was not found. Falling back to first available user {FallbackUserId}.",
+                _seedOptions.SeedUserId,
+                firstUserId.Value);
+
+            return firstUserId.Value;
+        }
+
         _logger.LogWarning(
-            "Configured IncidentSeed:SeedUserId {SeedUserId} was not found. Falling back to admin user for seed ownership.",
+            "Configured IncidentSeed:SeedUserId {SeedUserId} was not found and no fallback user is available.",
             _seedOptions.SeedUserId);
 
-        return fallbackUserId;
+        return null;
+    }
+
+    private async Task<Guid?> EnsureConfiguredAdminUserAsync(
+        IServiceProvider serviceProvider,
+        IncidentFlowDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_seedOptions.AdminEmail)
+            || string.IsNullOrWhiteSpace(_seedOptions.AdminUsername)
+            || string.IsNullOrWhiteSpace(_seedOptions.AdminPassword))
+        {
+            _logger.LogWarning(
+                "IncidentSeed:SeedAdminUser is enabled but admin credentials are incomplete. Provide IncidentSeed:AdminEmail, IncidentSeed:AdminUsername, and IncidentSeed:AdminPassword.");
+            return null;
+        }
+
+        var adminUser = await dbContext.Users
+            .FirstOrDefaultAsync(
+                user => user.Email.ToLower() == _seedOptions.AdminEmail!.ToLower(),
+                cancellationToken);
+
+        if (adminUser is null)
+        {
+            var passwordHashService = serviceProvider.GetRequiredService<IPasswordHashService>();
+            adminUser = new User
+            {
+                Username = _seedOptions.AdminUsername!,
+                FullName = "System Administrator",
+                Email = _seedOptions.AdminEmail!,
+                Role = "Admin",
+                PasswordHash = passwordHashService.HashPassword(_seedOptions.AdminPassword!),
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await dbContext.Users.AddAsync(adminUser, cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Seeded configured admin user {AdminEmail}.", _seedOptions.AdminEmail);
+        }
+        else
+        {
+            _logger.LogInformation("Configured admin user {AdminEmail} already exists. Skipping admin seed.", _seedOptions.AdminEmail);
+        }
+
+        return adminUser.Id;
+    }
+
+    private async Task<Guid?> EnsureConfiguredUsersAsync(
+        IServiceProvider serviceProvider,
+        IncidentFlowDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (_seedOptions.Users.Count == 0)
+        {
+            return null;
+        }
+
+        var passwordHashService = serviceProvider.GetRequiredService<IPasswordHashService>();
+        var firstSeededUserId = (Guid?)null;
+
+        foreach (var configuredUser in _seedOptions.Users)
+        {
+            if (string.IsNullOrWhiteSpace(configuredUser.Email)
+                || string.IsNullOrWhiteSpace(configuredUser.Username)
+                || string.IsNullOrWhiteSpace(configuredUser.Password))
+            {
+                _logger.LogWarning(
+                    "Skipping configured IncidentSeed user due to missing required fields. Email: {Email}, Username: {Username}",
+                    configuredUser.Email,
+                    configuredUser.Username);
+                continue;
+            }
+
+            var normalizedEmail = configuredUser.Email.Trim();
+            var normalizedUsername = configuredUser.Username.Trim();
+
+            var existingUser = await dbContext.Users.FirstOrDefaultAsync(
+                user => user.Email.ToLower() == normalizedEmail.ToLower() || user.Username.ToLower() == normalizedUsername.ToLower(),
+                cancellationToken);
+
+            var normalizedRole = NormalizeSeedRole(configuredUser.Role);
+            var normalizedFullName = string.IsNullOrWhiteSpace(configuredUser.FullName)
+                ? normalizedUsername
+                : configuredUser.FullName.Trim();
+
+            if (existingUser is null)
+            {
+                var createdUser = new User
+                {
+                    Username = normalizedUsername,
+                    Email = normalizedEmail,
+                    FullName = normalizedFullName,
+                    Role = normalizedRole,
+                    PasswordHash = passwordHashService.HashPassword(configuredUser.Password),
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await dbContext.Users.AddAsync(createdUser, cancellationToken);
+                await dbContext.SaveChangesAsync(cancellationToken);
+
+                if (!firstSeededUserId.HasValue)
+                {
+                    firstSeededUserId = createdUser.Id;
+                }
+
+                _logger.LogInformation(
+                    "Seeded configured user {Email} with role {Role}.",
+                    createdUser.Email,
+                    createdUser.Role);
+                continue;
+            }
+
+            var changed = false;
+            if (!string.Equals(existingUser.Role, normalizedRole, StringComparison.Ordinal))
+            {
+                existingUser.Role = normalizedRole;
+                changed = true;
+            }
+
+            if (!string.Equals(existingUser.FullName, normalizedFullName, StringComparison.Ordinal))
+            {
+                existingUser.FullName = normalizedFullName;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                dbContext.Users.Update(existingUser);
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+
+            if (!firstSeededUserId.HasValue)
+            {
+                firstSeededUserId = existingUser.Id;
+            }
+
+            _logger.LogInformation(
+                "Configured user {Email} already exists. Ensured role and profile fields are up to date.",
+                existingUser.Email);
+        }
+
+        return firstSeededUserId;
+    }
+
+    private string NormalizeSeedRole(string? role)
+    {
+        if (string.IsNullOrWhiteSpace(role))
+        {
+            return "User";
+        }
+
+        return role.Trim() switch
+        {
+            "Admin" => "Admin",
+            "Manager" => "Manager",
+            "Responder" => "Responder",
+            "User" => "User",
+            _ => "User"
+        };
     }
 }
