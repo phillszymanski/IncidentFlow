@@ -15,8 +15,44 @@ export type AssignableUser = {
   role: string;
 };
 
-export const getIncidents = async (): Promise<Incident[]> => {
-  const response = await apiClient.get<Incident[]>("/Incident");
+export type PagedIncidentsResponse = {
+  items: Incident[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+};
+
+export type DashboardCountItem = {
+  label: string;
+  count: number;
+};
+
+export type IncidentDashboardSummary = {
+  totalIncidents: number;
+  openIncidents: number;
+  criticalIncidents: number;
+  resolvedThisWeek: number;
+  unassignedIncidents: number;
+  assignedToMeIncidents: number;
+  severity: DashboardCountItem[];
+  status: DashboardCountItem[];
+  trend: DashboardCountItem[];
+};
+
+export type IncidentListFilter = "total" | "open" | "critical" | "resolvedthisweek" | "unassigned" | "assignedtome";
+
+export const getIncidents = async (
+  page = 1,
+  pageSize = 10,
+  filter: IncidentListFilter = "total"
+): Promise<PagedIncidentsResponse> => {
+  const response = await apiClient.get<PagedIncidentsResponse>("/Incident", {
+    params: {
+      page,
+      pageSize,
+      filter
+    }
+  });
   return response.data;
 };
 
@@ -68,5 +104,10 @@ export const getAssignableUsers = async (): Promise<AssignableUser[]> => {
 
 export const getUserDirectory = async (): Promise<AssignableUser[]> => {
   const response = await apiClient.get<AssignableUser[]>("/User/directory");
+  return response.data;
+};
+
+export const getIncidentDashboardSummary = async (): Promise<IncidentDashboardSummary> => {
+  const response = await apiClient.get<IncidentDashboardSummary>("/Incident/dashboard-summary");
   return response.data;
 };

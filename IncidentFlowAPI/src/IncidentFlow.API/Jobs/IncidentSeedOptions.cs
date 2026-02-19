@@ -6,6 +6,8 @@ public sealed class IncidentSeedOptions
 {
     public bool Enabled { get; set; } = true;
     public Guid SeedUserId { get; set; } = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    public int NumberOfIncidents { get; set; } = 25;
+    public int IncidentLogsPerIncident { get; set; } = 5;
     public List<IncidentSeedItem> Items { get; set; } = [];
 }
 

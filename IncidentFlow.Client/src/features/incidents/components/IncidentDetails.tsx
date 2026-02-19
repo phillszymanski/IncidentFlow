@@ -38,10 +38,10 @@ const statusStyles: Record<string, string> = {
 };
 
 const severityStyles: Record<string, string> = {
-  Low: "bg-slate-500 text-sky-800 text-xs font-medium px-2.5 py-0.5 rounded-full",
-  Medium: "bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full",
-  High: "bg-amber-500 text-white text-xs font-medium px-2.5 py-0.5 rounded-full",
-  Critical: "bg-red-500 text-white text-xs font-medium px-2.5 py-0.5 rounded-full"
+  Low: "bg-slate-500/15 text-slate-300 ring-1 ring-slate-400/30",
+  Medium: "bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-400/30",
+  High: "bg-orange-500/20 text-orange-300 ring-1 ring-orange-400/40",
+  Critical: "bg-rose-500/15 text-rose-300 ring-1 ring-rose-400/30"
 };
 
 const getDisplayStatus = (rawStatus: string) => {
@@ -242,7 +242,7 @@ export const IncidentDetails = ({
 
   return (
     <div className="lg:sticky lg:top-6">
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+      <div className={`grid gap-3 lg:items-start ${canViewTimeline ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : "lg:grid-cols-1"}`}>
         <div className="space-y-3">
           <aside className="rounded-2xl border border-slate-800/80 bg-slate-900/70 p-6 shadow-xl shadow-slate-950/40">
             <div className="flex items-start justify-between gap-3">
@@ -254,7 +254,7 @@ export const IncidentDetails = ({
                     void handleStatusChange(event.target.value as (typeof statusOptions)[number]);
                   }}
                   disabled={statusSubmitting}
-                  className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-100 outline-none transition focus:border-sky-400/70 focus:ring-2 focus:ring-sky-400/30"
+                  className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold text-slate-100 outline-none transition focus:border-sky-400/70 focus:ring-2 focus:ring-sky-400/30"
                 >
                   {statusOptions.map((statusOption) => (
                     <option key={statusOption} value={statusOption}>
@@ -286,7 +286,9 @@ export const IncidentDetails = ({
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Severity</p>
-                  <p className={`mt-1 text-sm text-slate-200 ${severityStyles[displaySeverity] ?? "bg-slate-500/15 text-slate-300 ring-1 ring-slate-400/30"}`}>{displaySeverity}</p>
+                  <span className={`mt-1 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${severityStyles[displaySeverity] ?? "bg-slate-500/15 text-slate-300 ring-1 ring-slate-400/30"}`}>
+                    {displaySeverity}
+                  </span>
                 </div>
 
                 <div>
@@ -358,12 +360,7 @@ export const IncidentDetails = ({
             logsError={logsError}
             logs={logs}
           />
-        ) : (
-          <aside className="rounded-2xl border border-slate-800/80 bg-slate-900/70 p-6 shadow-xl shadow-slate-950/40">
-            <p className="text-sm font-medium text-slate-200">Activity Timeline</p>
-            <p className="mt-2 text-sm text-slate-400">You do not have permission to view audit logs.</p>
-          </aside>
-        )}
+        ) : null}
       </div>
     </div>
   );

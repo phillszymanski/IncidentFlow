@@ -22,11 +22,44 @@ namespace IncidentFlow.API.Controllers
         // GET: api/Incident
         [Authorize(Policy = PolicyConstants.CanReadIncidents)]
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string filter = "total")
         {
-            var incidents = await _mediator.Send(new GetAllIncidentsQuery());
-            var dto = incidents.Select(i => i.ToResponseDto());
+            var normalizedPage = Math.Max(1, page);
+            var normalizedPageSize = Math.Clamp(pageSize, 1, 50);
+            var userIdClaim = User.FindFirst("userId")?.Value;
+            var currentUserId = Guid.TryParse(userIdClaim, out var parsedUserId) ? parsedUserId : (Guid?)null;
+
+            var parsedFilter = Enum.TryParse<IncidentListFilterType>(filter, true, out var filterType)
+                ? filterType
+                : IncidentListFilterType.Total;
+
+            var result = await _mediator.Send(new GetAllIncidentsQuery(
+                normalizedPage,
+                normalizedPageSize,
+                parsedFilter,
+                currentUserId));
+            var dto = new PagedIncidentResponseDto
+            {
+                Items = result.Items.Select(i => i.ToResponseDto()).ToList(),
+                TotalCount = result.TotalCount,
+                Page = result.Page,
+                PageSize = result.PageSize
+            };
+
             return HandleResult(dto);
+        }
+
+        [Authorize(Policy = PolicyConstants.CanReadIncidents)]
+        [HttpGet("dashboard-summary")]
+        public async Task<IActionResult> GetDashboardSummary()
+        {
+            var userIdClaim = User.FindFirst("userId")?.Value;
+            var currentUserId = Guid.TryParse(userIdClaim, out var parsedUserId) ? parsedUserId : (Guid?)null;
+            var summary = await _mediator.Send(new GetIncidentDashboardSummaryQuery(currentUserId));
+            return HandleResult(summary.ToResponseDto());
         }
 
         // GET: api/Incident/{id}

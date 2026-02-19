@@ -1,4 +1,5 @@
 using IncidentFlow.Domain.Entities;
+using IncidentFlow.Application.Features.Incidents.Queries;
 
 namespace IncidentFlow.Application.Interfaces
 {
@@ -18,6 +19,13 @@ namespace IncidentFlow.Application.Interfaces
 
         // List all incidents (optional: add paging/filters later)
         Task<List<Incident>> GetAllAsync(CancellationToken cancellationToken = default);
+
+        Task<(List<Incident> Items, int TotalCount)> GetPagedAsync(
+            int page,
+            int pageSize,
+            IncidentListFilterType filter,
+            Guid? currentUserId,
+            CancellationToken cancellationToken = default);
 
         // Example: get by status or severity
         Task<List<Incident>> GetByStatusAsync(IncidentStatus status, CancellationToken cancellationToken = default);
