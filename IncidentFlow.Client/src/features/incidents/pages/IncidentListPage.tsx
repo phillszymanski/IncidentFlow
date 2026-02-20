@@ -10,42 +10,18 @@ import {
   type IncidentDashboardSummary,
   type IncidentListFilter
 } from "../incidentApi";
-import { type Incident, IncidentSeverity, IncidentStatus } from "../types";
+import { type Incident } from "../types";
+import {
+  incidentSeverityStyles,
+  incidentStatusStyles,
+  normalizeIncidentSeverity,
+  normalizeIncidentStatus
+} from "../presentation";
 
 type IncidentListPageProps = {
   currentUser: AuthUser;
   onReportIncident: () => void;
   onEditIncident: (incident: Incident) => void;
-};
-
-const statusStyles: Record<string, string> = {
-  Open: "bg-sky-500/15 text-sky-300 ring-1 ring-sky-400/30",
-  InProgress: "bg-amber-500/15 text-amber-300 ring-1 ring-amber-400/30",
-  Resolved: "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/30",
-  Closed: "bg-slate-500/15 text-slate-300 ring-1 ring-slate-400/30"
-};
-
-const severityStyles: Record<string, string> = {
-  Low: "bg-slate-500/15 text-slate-300 ring-1 ring-slate-400/30",
-  Medium: "bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-400/30",
-  High: "bg-orange-500/20 text-orange-300 ring-1 ring-orange-400/40",
-  Critical: "bg-rose-500/15 text-rose-300 ring-1 ring-rose-400/30"
-};
-
-const normalizeStatus = (rawStatus: string) => {
-  if (rawStatus in IncidentStatus) {
-    return IncidentStatus[rawStatus as keyof typeof IncidentStatus];
-  }
-
-  return rawStatus;
-};
-
-const normalizeSeverity = (rawSeverity: string) => {
-  if (rawSeverity in IncidentSeverity) {
-    return IncidentSeverity[rawSeverity as keyof typeof IncidentSeverity];
-  }
-
-  return rawSeverity;
 };
 
 export const IncidentListPage = ({ currentUser, onReportIncident, onEditIncident }: IncidentListPageProps) => {
@@ -251,8 +227,8 @@ export const IncidentListPage = ({ currentUser, onReportIncident, onEditIncident
 
               <ul className="grid max-h-[calc(100vh-18rem)] gap-4 overflow-y-auto pr-1">
                 {incidents.map((incident) => {
-                  const displayStatus = normalizeStatus(incident.status);
-                  const displaySeverity = normalizeSeverity(incident.severity);
+                  const displayStatus = normalizeIncidentStatus(incident.status);
+                  const displaySeverity = normalizeIncidentSeverity(incident.severity);
                   const isSelected = selectedIncidentId === incident.id;
 
                   return (
@@ -267,7 +243,7 @@ export const IncidentListPage = ({ currentUser, onReportIncident, onEditIncident
                         }`}
                       >
                         <span
-                          className={`absolute right-4 top-4 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[displayStatus] ?? "bg-slate-500/15 text-slate-300 ring-1 ring-slate-400/30"}`}
+                          className={`absolute right-4 top-4 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${incidentStatusStyles[displayStatus] ?? "bg-slate-500/15 text-slate-300 ring-1 ring-slate-400/30"}`}
                         >
                           {displayStatus}
                         </span>
@@ -276,7 +252,7 @@ export const IncidentListPage = ({ currentUser, onReportIncident, onEditIncident
                           <div className="space-y-2">
                             <h2 className="text-base font-semibold text-slate-100">{incident.title}</h2>
                             <span
-                              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${severityStyles[displaySeverity] ?? "bg-slate-500/15 text-slate-300 ring-1 ring-slate-400/30"}`}
+                              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${incidentSeverityStyles[displaySeverity] ?? "bg-slate-500/15 text-slate-300 ring-1 ring-slate-400/30"}`}
                             >
                               {displaySeverity}
                             </span>

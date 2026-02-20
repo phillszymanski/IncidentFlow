@@ -10,12 +10,19 @@ import {
 import { IncidentCommentsSection } from "./IncidentCommentsSection";
 import { IncidentTimelineSection } from "./IncidentTimelineSection";
 import {
-  IncidentSeverity,
   IncidentStatus,
   type Incident,
   type IncidentComment,
   type IncidentLog
 } from "../types";
+import {
+  incidentSeverityStyles,
+  incidentStatusOptions,
+  type IncidentStatusOption,
+  incidentStatusStyles,
+  normalizeIncidentSeverity,
+  normalizeIncidentStatus
+} from "../presentation";
 
 type IncidentDetailsProps = {
   incident: Incident | null;
@@ -26,38 +33,6 @@ type IncidentDetailsProps = {
   onEdit?: () => void;
   onDelete?: () => void;
   onIncidentUpdated?: () => Promise<void>;
-};
-
-const statusOptions = ["Open", "InProgress", "Resolved", "Closed"] as const;
-
-const statusStyles: Record<string, string> = {
-  Open: "bg-sky-500/15 text-sky-300 ring-1 ring-sky-400/30",
-  InProgress: "bg-amber-500/15 text-amber-300 ring-1 ring-amber-400/30",
-  Resolved: "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/30",
-  Closed: "bg-slate-500/15 text-slate-300 ring-1 ring-slate-400/30"
-};
-
-const severityStyles: Record<string, string> = {
-  Low: "bg-slate-500/15 text-slate-300 ring-1 ring-slate-400/30",
-  Medium: "bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-400/30",
-  High: "bg-orange-500/20 text-orange-300 ring-1 ring-orange-400/40",
-  Critical: "bg-rose-500/15 text-rose-300 ring-1 ring-rose-400/30"
-};
-
-const getDisplayStatus = (rawStatus: string) => {
-  if (rawStatus in IncidentStatus) {
-    return IncidentStatus[rawStatus as keyof typeof IncidentStatus];
-  }
-
-  return rawStatus;
-};
-
-const getDisplaySeverity = (rawSeverity: string) => {
-  if (rawSeverity in IncidentSeverity) {
-    return IncidentSeverity[rawSeverity as keyof typeof IncidentSeverity];
-  }
-
-  return rawSeverity;
 };
 
 export const IncidentDetails = ({
@@ -71,7 +46,7 @@ export const IncidentDetails = ({
   onIncidentUpdated
 }: IncidentDetailsProps) => {
   const [newComment, setNewComment] = useState("");
-  const [statusValue, setStatusValue] = useState<(typeof statusOptions)[number]>("Open");
+  const [statusValue, setStatusValue] = useState<IncidentStatusOption>("Open");
   const [statusSubmitting, setStatusSubmitting] = useState(false);
   const [comments, setComments] = useState<IncidentComment[]>([]);
   const [logs, setLogs] = useState<IncidentLog[]>([]);
@@ -89,9 +64,9 @@ export const IncidentDetails = ({
       return;
     }
 
-    const currentStatus = getDisplayStatus(incident.status);
-    if (statusOptions.includes(currentStatus as (typeof statusOptions)[number])) {
-      setStatusValue(currentStatus as (typeof statusOptions)[number]);
+    const currentStatus = normalizeIncidentStatus(incident.status);
+    if (incidentStatusOptions.includes(currentStatus as IncidentStatusOption)) {
+      setStatusValue(currentStatus as IncidentStatusOption);
     }
   }, [incident]);
 
@@ -176,8 +151,8 @@ export const IncidentDetails = ({
     );
   }
 
-  const displayStatus = getDisplayStatus(incident.status);
-  const displaySeverity = getDisplaySeverity(incident.severity);
+  const displayStatus = normalizeIncidentStatus(incident.status);
+  const displaySeverity = normalizeIncidentSeverity(incident.severity);
   const assignedUser = incident.assignedTo
     ? users.find((user) => user.id === incident.assignedTo) ?? null
     : null;
@@ -190,7 +165,7 @@ export const IncidentDetails = ({
     : "Unassigned";
   const lastUpdatedAt = incident.updatedAt ?? incident.resolvedAt ?? incident.createdAt;
 
-  const handleStatusChange = async (nextStatus: (typeof statusOptions)[number]) => {
+  const handleStatusChange = async (nextStatus: IncidentStatusOption) => {
     if (!incident || !canChangeStatus) {
       return;
     }
@@ -210,7 +185,7 @@ export const IncidentDetails = ({
       }
     } catch (error) {
       setStatusError(error instanceof Error ? error.message : "Failed to update status.");
-      setStatusValue(displayStatus as (typeof statusOptions)[number]);
+      setStatusValue(displayStatus as IncidentStatusOption);
     } finally {
       setStatusSubmitting(false);
     }
@@ -251,12 +226,12 @@ export const IncidentDetails = ({
                 <select
                   value={statusValue}
                   onChange={(event) => {
-                    void handleStatusChange(event.target.value as (typeof statusOptions)[number]);
+                    void handleStatusChange(event.target.value as IncidentStatusOption);
                   }}
                   disabled={statusSubmitting}
                   className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold text-slate-100 outline-none transition focus:border-sky-400/70 focus:ring-2 focus:ring-sky-400/30"
                 >
-                  {statusOptions.map((statusOption) => (
+                  {incidentStatusOptions.map((statusOption) => (
                     <option key={statusOption} value={statusOption}>
                       {statusOption}
                     </option>
@@ -264,7 +239,7 @@ export const IncidentDetails = ({
                 </select>
               ) : (
                 <span
-                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[displayStatus] ?? "bg-slate-500/15 text-slate-300 ring-1 ring-slate-400/30"}`}
+                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${incidentStatusStyles[displayStatus] ?? "bg-slate-500/15 text-slate-300 ring-1 ring-slate-400/30"}`}
                 >
                   {displayStatus}
                 </span>
@@ -286,7 +261,7 @@ export const IncidentDetails = ({
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Severity</p>
-                  <span className={`mt-1 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${severityStyles[displaySeverity] ?? "bg-slate-500/15 text-slate-300 ring-1 ring-slate-400/30"}`}>
+                  <span className={`mt-1 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${incidentSeverityStyles[displaySeverity] ?? "bg-slate-500/15 text-slate-300 ring-1 ring-slate-400/30"}`}>
                     {displaySeverity}
                   </span>
                 </div>

@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { AuthPage } from "./features/auth/pages/AuthPage"
-import { getCurrentUser, logout, type AuthUser } from "./features/auth/authApi"
+import type { AuthUser } from "./features/auth/authApi"
+import { useAuthSession } from "./features/auth/AuthSessionContext"
 import { IncidentListPage } from "./features/incidents/pages/IncidentListPage"
 import { NewIncidentPage } from "./features/incidents/pages/NewIncidentPage"
 import type { Incident } from "./features/incidents/types"
@@ -11,18 +12,7 @@ function App() {
   const [page, setPage] = useState<AppPage>("list")
   const [listVersion, setListVersion] = useState(0)
   const [editingIncident, setEditingIncident] = useState<Incident | null>(null)
-  const [authLoading, setAuthLoading] = useState(true)
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
-
-  useEffect(() => {
-    const hydrateSession = async () => {
-      const user = await getCurrentUser()
-      setCurrentUser(user)
-      setAuthLoading(false)
-    }
-
-    void hydrateSession()
-  }, [])
+  const { authLoading, currentUser, setAuthenticatedUser, signOut } = useAuthSession()
 
   const handleReportIncident = () => {
     setEditingIncident(null)
@@ -46,13 +36,12 @@ function App() {
   }
 
   const handleAuthenticated = (user: AuthUser) => {
-    setCurrentUser(user)
+    setAuthenticatedUser(user)
     setPage("list")
   }
 
   const handleLogout = async () => {
-    await logout()
-    setCurrentUser(null)
+    await signOut()
     setEditingIncident(null)
     setPage("list")
   }
