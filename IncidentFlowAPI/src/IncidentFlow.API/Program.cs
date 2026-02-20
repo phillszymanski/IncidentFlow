@@ -9,6 +9,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Security.Cryptography;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,10 +29,31 @@ var jwtOptions = builder.Configuration
 
 if (string.IsNullOrWhiteSpace(jwtOptions.Secret))
 {
-    throw new InvalidOperationException("Jwt:Secret must be configured.");
+    if (builder.Environment.IsDevelopment())
+    {
+        jwtOptions.Secret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+        builder.Logging.AddConsole();
+        using var loggerFactory = LoggerFactory.Create(logging => logging.AddConsole());
+        loggerFactory.CreateLogger("Startup").LogWarning("Jwt:Secret is not configured. Using an ephemeral development-only signing key.");
+    }
+    else
+    {
+        throw new InvalidOperationException("Jwt:Secret must be configured via secure configuration (environment variable, user secrets, or secret store).");
+    }
 }
 
 var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Secret));
+var configuredOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+
+if (builder.Environment.IsDevelopment() && configuredOrigins.Length == 0)
+{
+    configuredOrigins = ["http://localhost:5173"];
+}
+
+if (!builder.Environment.IsDevelopment() && configuredOrigins.Length == 0)
+{
+    throw new InvalidOperationException("Cors:AllowedOrigins must be configured outside development.");
+}
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -103,15 +125,25 @@ builder.Services.AddScoped<ICommentRepository>(provider =>
 
 builder.Services.AddHostedService<IncidentStartupSeedJob>();
 
-    builder.Services.AddCors(options =>
+builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend",
         policy =>
         {
-            policy.WithOrigins("http://localhost:5173")
-                  .AllowAnyHeader()
-                  .AllowAnyMethod()
+            policy.WithOrigins(configuredOrigins)
                   .AllowCredentials();
+
+            if (builder.Environment.IsDevelopment())
+            {
+                policy.AllowAnyHeader()
+                      .AllowAnyMethod();
+            }
+            else
+            {
+                policy.WithHeaders("Content-Type", jwtOptions.CsrfHeaderName)
+                      .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")
+                      .SetPreflightMaxAge(TimeSpan.FromMinutes(10));
+            }
         });
 });
 
@@ -124,6 +156,39 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 app.UseCors("AllowFrontend");
+
+app.Use(async (context, next) =>
+{
+    var isMutatingRequest = HttpMethods.IsPost(context.Request.Method)
+        || HttpMethods.IsPut(context.Request.Method)
+        || HttpMethods.IsPatch(context.Request.Method)
+        || HttpMethods.IsDelete(context.Request.Method);
+
+    if (!isMutatingRequest)
+    {
+        await next();
+        return;
+    }
+
+    var hasAuthCookie = context.Request.Cookies.TryGetValue(jwtOptions.CookieName, out _);
+    if (!hasAuthCookie)
+    {
+        await next();
+        return;
+    }
+
+    var hasCsrfCookie = context.Request.Cookies.TryGetValue(jwtOptions.CsrfCookieName, out var csrfCookieValue);
+    var hasCsrfHeader = context.Request.Headers.TryGetValue(jwtOptions.CsrfHeaderName, out var csrfHeaderValue);
+
+    if (!hasCsrfCookie || !hasCsrfHeader || !string.Equals(csrfCookieValue, csrfHeaderValue.ToString(), StringComparison.Ordinal))
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsync("CSRF token validation failed.");
+        return;
+    }
+
+    await next();
+});
 
 app.UseHttpsRedirection();
 

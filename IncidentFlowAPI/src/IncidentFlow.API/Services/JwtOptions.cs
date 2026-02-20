@@ -9,4 +9,6 @@ public sealed class JwtOptions
     public string Audience { get; set; } = string.Empty;
     public int ExpiryMinutes { get; set; } = 60;
     public string CookieName { get; set; } = "incidentflow_access";
+    public string CsrfCookieName { get; set; } = "incidentflow_csrf";
+    public string CsrfHeaderName { get; set; } = "X-CSRF-TOKEN";
 }

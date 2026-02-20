@@ -4,6 +4,7 @@ using IncidentFlow.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
 
 namespace IncidentFlow.API.Controllers;
 
@@ -47,6 +48,7 @@ public class AuthController : BaseController
         }
 
         var token = _jwtTokenService.CreateToken(user);
+        var csrfToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         var isHttps = Request.IsHttps;
 
         Response.Cookies.Append(_jwtOptions.CookieName, token, new CookieOptions
@@ -57,6 +59,17 @@ public class AuthController : BaseController
             Expires = DateTimeOffset.UtcNow.AddMinutes(_jwtOptions.ExpiryMinutes),
             IsEssential = true
         });
+
+        Response.Cookies.Append(_jwtOptions.CsrfCookieName, csrfToken, new CookieOptions
+        {
+            HttpOnly = false,
+            Secure = isHttps,
+            SameSite = isHttps ? SameSiteMode.None : SameSiteMode.Lax,
+            Expires = DateTimeOffset.UtcNow.AddMinutes(_jwtOptions.ExpiryMinutes),
+            IsEssential = true
+        });
+
+        Response.Headers[_jwtOptions.CsrfHeaderName] = csrfToken;
 
         return Ok(new LoginResponseDto
         {
@@ -79,6 +92,14 @@ public class AuthController : BaseController
         Response.Cookies.Delete(_jwtOptions.CookieName, new CookieOptions
         {
             HttpOnly = true,
+            Secure = isHttps,
+            SameSite = isHttps ? SameSiteMode.None : SameSiteMode.Lax,
+            IsEssential = true
+        });
+
+        Response.Cookies.Delete(_jwtOptions.CsrfCookieName, new CookieOptions
+        {
+            HttpOnly = false,
             Secure = isHttps,
             SameSite = isHttps ? SameSiteMode.None : SameSiteMode.Lax,
             IsEssential = true
