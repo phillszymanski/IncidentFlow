@@ -1,11 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
-using IncidentFlow.API.Services;
-using IncidentFlow.Domain.Entities;
+using IncidentFlow.API.Contracts.Auth;
 using IncidentFlow.IntegrationTests.Infrastructure;
-using IncidentFlow.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace IncidentFlow.IntegrationTests.Auth;
 
@@ -21,13 +17,13 @@ public class AuthFlowIntegrationTests : IClassFixture<ApiWebApplicationFactory>
     [Fact]
     public async Task Login_SetsAuthAndCsrfCookies_AndReturnsCsrfHeader()
     {
-        using var client = CreateClient();
-        var credentials = await SeedUserAsync();
+        using var client = IntegrationTestData.CreateClient(_factory);
+        var (user, password) = await IntegrationTestData.SeedUserAsync(_factory);
 
-        var loginResponse = await client.PostAsJsonAsync("/api/Auth/login", new LoginRequest
+        var loginResponse = await client.PostAsJsonAsync("/api/Auth/login", new LoginRequestDto
         {
-            UsernameOrEmail = credentials.Username,
-            Password = credentials.Password
+            UsernameOrEmail = user.Username,
+            Password = password
         });
 
         Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
@@ -45,13 +41,13 @@ public class AuthFlowIntegrationTests : IClassFixture<ApiWebApplicationFactory>
     [Fact]
     public async Task Logout_WithAuthCookieButMissingCsrfHeader_ReturnsForbidden()
     {
-        using var client = CreateClient();
-        var credentials = await SeedUserAsync();
+        using var client = IntegrationTestData.CreateClient(_factory);
+        var (user, password) = await IntegrationTestData.SeedUserAsync(_factory);
 
-        var loginResponse = await client.PostAsJsonAsync("/api/Auth/login", new LoginRequest
+        var loginResponse = await client.PostAsJsonAsync("/api/Auth/login", new LoginRequestDto
         {
-            UsernameOrEmail = credentials.Username,
-            Password = credentials.Password
+            UsernameOrEmail = user.Username,
+            Password = password
         });
 
         Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
@@ -66,51 +62,49 @@ public class AuthFlowIntegrationTests : IClassFixture<ApiWebApplicationFactory>
     [Fact]
     public async Task Logout_WithoutAuthCookie_ReturnsUnauthorized()
     {
-        using var client = CreateClient();
+        using var client = IntegrationTestData.CreateClient(_factory);
 
         var logoutResponse = await client.PostAsync("/api/Auth/logout", content: null);
 
         Assert.Equal(HttpStatusCode.Unauthorized, logoutResponse.StatusCode);
     }
 
-    private HttpClient CreateClient()
+    [Fact]
+    public async Task Login_WithMissingUsernameOrPassword_ReturnsBadRequest()
     {
-        return _factory.CreateClient(new WebApplicationFactoryClientOptions
+        using var client = IntegrationTestData.CreateClient(_factory);
+
+        var response = await client.PostAsJsonAsync("/api/Auth/login", new LoginRequestDto
         {
-            BaseAddress = new Uri("https://localhost"),
-            AllowAutoRedirect = false,
-            HandleCookies = true
+            UsernameOrEmail = "",
+            Password = ""
         });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    private async Task<(string Username, string Password)> SeedUserAsync()
+    [Fact]
+    public async Task Login_WithInvalidCredentials_ReturnsUnauthorized()
     {
-        var username = $"test-user-{Guid.NewGuid():N}";
-        var password = "P@ssword123!";
+        using var client = IntegrationTestData.CreateClient(_factory);
+        var (user, _) = await IntegrationTestData.SeedUserAsync(_factory);
 
-        using var scope = _factory.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<IncidentFlowDbContext>();
-        var hashService = scope.ServiceProvider.GetRequiredService<IPasswordHashService>();
-
-        var user = new User
+        var response = await client.PostAsJsonAsync("/api/Auth/login", new LoginRequestDto
         {
-            Username = username,
-            Email = $"{username}@test.local",
-            FullName = "Integration Test User",
-            Role = "User",
-            PasswordHash = hashService.HashPassword(password),
-            CreatedAt = DateTime.UtcNow
-        };
+            UsernameOrEmail = user.Username,
+            Password = "wrong-password"
+        });
 
-        await dbContext.Users.AddAsync(user);
-        await dbContext.SaveChangesAsync();
-
-        return (username, password);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    private sealed record LoginRequest
+    [Fact]
+    public async Task Me_WithoutAuthCookie_ReturnsUnauthorized()
     {
-        public string UsernameOrEmail { get; init; } = string.Empty;
-        public string Password { get; init; } = string.Empty;
+        using var client = IntegrationTestData.CreateClient(_factory);
+
+        var response = await client.GetAsync("/api/Auth/me");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 }
